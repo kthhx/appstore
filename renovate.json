@@ -1,0 +1,25 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base"],
+  "gitIgnoredAuthors": [
+    "githubaction@githubaction.com"
+  ],
+  "rebaseWhen": "automerging",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update image tags set in app scripts, marked with a '# renovate:' comment",
+      "managerFilePatterns": ["/^apps/[^/]+/[^/]+/scripts/[^/]+\\.sh$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>[a-z-]+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*[A-Za-z_][A-Za-z0-9_]*=[\"']?[^\\s\"']+:(?<currentValue>[^\\s\"':]+)"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "packageNames": ["docker-compose"],
+      "automerge": true
+    }
+  ],
+  "prCreation": "immediate"
+}
