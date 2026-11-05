@@ -15,6 +15,10 @@ The official repository for the [1Panel](https://github.com/1Panel-dev/1Panel) A
 
 If you encounter any problems during use or have additional feedback, please submit a GitHub Issue to the [main 1Panel repository](https://github.com/1Panel-dev/1Panel/issues).
 
+## Renovate Auto-merge
+
+Renovate opens a pull request for every app update. Since each app version is part of its directory name, a follow-up commit renames `apps/<app>/<old-version>` to `apps/<app>/<new-version>` on the Renovate branch. Merging is therefore not left to Renovate itself (`automerge` is disabled in `renovate.json`): once that follow-up commit is pushed and every pull request check has passed, the `Auto-merge Renovate PR` job in `.github/workflows/renovate-app-version.yml` squash-merges the pull request and deletes the branch. Pull requests with failing checks, or with checks still running after 20 minutes, are left open for review.
+
 ## Creating Local Applications
 
 [How to submit your own application](https://github.com/1Panel-dev/appstore/wiki/How-to-submit-your-own-application)

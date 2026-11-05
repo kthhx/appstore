@@ -5,6 +5,7 @@
     "githubaction@githubaction.com"
   ],
   "rebaseWhen": "automerging",
+  "automerge": false,
   "customManagers": [
     {
       "customType": "regex",
@@ -13,12 +14,6 @@
       "matchStrings": [
         "#\\s*renovate:\\s*datasource=(?<datasource>[a-z-]+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*[A-Za-z_][A-Za-z0-9_]*=[\"']?[^\\s\"']+:(?<currentValue>[^\\s\"':]+)"
       ]
-    }
-  ],
-  "packageRules": [
-    {
-      "packageNames": ["docker-compose"],
-      "automerge": true
     }
   ],
   "prCreation": "immediate"

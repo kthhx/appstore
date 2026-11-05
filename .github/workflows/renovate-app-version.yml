@@ -8,6 +8,12 @@ on:
       manual-trigger:
         description: 'Manually trigger Renovate'
         default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
 jobs:
   update-app-version:
     runs-on: ubuntu-latest
@@ -25,7 +31,7 @@ jobs:
       - name: Get list of updated files by the last commit in this branch separated by space
         id: updated-files
         run: |
-          echo "::set-output name=files::$(git diff-tree --no-commit-id --name-only -r ${{ github.sha }} | tr '\n' ' ')"
+          echo "files=$(git diff-tree --no-commit-id --name-only -r ${{ github.sha }} | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
 
       - name: Run renovate-app-version.sh on updated files
         run: |
@@ -51,3 +57,72 @@ jobs:
             fi
           done
 
+  auto-merge:
+    name: Auto-merge Renovate PR
+    needs: update-app-version
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find the pull request for this branch
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUBTOKEN || github.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # Renovate usually creates the pull request seconds after it pushes the
+          # branch, so give it a few minutes before giving up.
+          deadline=$((SECONDS + 300))
+          number=""
+          while [[ -z "$number" && $SECONDS -lt $deadline ]]; do
+            number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty' || true)
+            if [[ -z "$number" ]]; then
+              echo "No open pull request for $BRANCH yet; retrying in 15s."
+              sleep 15
+            fi
+          done
+          if [[ -z "$number" ]]; then
+            echo "No open pull request for $BRANCH; nothing to merge."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "number=$number" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for pull request checks
+        if: steps.pr.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUBTOKEN || github.token }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          deadline=$((SECONDS + 1200))
+          while true; do
+            rollup=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json statusCheckRollup --jq '.statusCheckRollup // []')
+            pending=$(jq '[.[] | select((.status // .state // "") as $s | $s == "PENDING" or $s == "IN_PROGRESS" or $s == "QUEUED" or $s == "WAITING")] | length' <<< "$rollup")
+            failed=$(jq '[.[] | select((.conclusion // .state // "") as $s | $s == "FAILURE" or $s == "ERROR" or $s == "CANCELLED" or $s == "TIMED_OUT" or $s == "ACTION_REQUIRED" or $s == "STARTUP_FAILURE")] | length' <<< "$rollup")
+            echo "pending=$pending failed=$failed"
+            if [[ $failed -gt 0 ]]; then
+              echo "::error::Pull request #$PR has failing checks; leaving it open for review."
+              exit 1
+            fi
+            if [[ $pending -eq 0 ]]; then
+              break
+            fi
+            if [[ $SECONDS -gt $deadline ]]; then
+              echo "::error::Timed out waiting for checks on pull request #$PR; leaving it open for review."
+              exit 1
+            fi
+            sleep 20
+          done
+
+      - name: Merge the pull request
+        if: steps.pr.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUBTOKEN || github.token }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          if gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --squash --delete-branch; then
+            echo "Merged pull request #$PR."
+            exit 0
+          fi
+          echo "Direct merge failed; requesting GitHub auto-merge instead."
+          gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --squash --auto --delete-branch
