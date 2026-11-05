@@ -93,12 +93,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUBTOKEN || github.token }}
           PR: ${{ steps.pr.outputs.number }}
+          RUN_ID: ${{ github.run_id }}
         run: |
+          # Checks created by this workflow run (notably the check for this very
+          # job) are part of the pull request's status check rollup. Waiting for
+          # them would mean waiting on ourselves until the timeout, so they are
+          # filtered out before the checks are evaluated.
           deadline=$((SECONDS + 1200))
           while true; do
             rollup=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json statusCheckRollup --jq '.statusCheckRollup // []')
-            pending=$(jq '[.[] | select((.status // .state // "") as $s | $s == "PENDING" or $s == "IN_PROGRESS" or $s == "QUEUED" or $s == "WAITING")] | length' <<< "$rollup")
-            failed=$(jq '[.[] | select((.conclusion // .state // "") as $s | $s == "FAILURE" or $s == "ERROR" or $s == "CANCELLED" or $s == "TIMED_OUT" or $s == "ACTION_REQUIRED" or $s == "STARTUP_FAILURE")] | length' <<< "$rollup")
+            relevant=$(jq --arg rid "$RUN_ID" '[.[] | select((((.detailsUrl // "") | contains("/runs/" + $rid + "/")) | not) and ((.name // .context // "") != "Auto-merge Renovate PR"))]' <<< "$rollup")
+            pending=$(jq '[.[] | select((.status // .state // "") as $s | $s == "PENDING" or $s == "IN_PROGRESS" or $s == "QUEUED" or $s == "WAITING")] | length' <<< "$relevant")
+            failed=$(jq '[.[] | select((.conclusion // .state // "") as $s | $s == "FAILURE" or $s == "ERROR" or $s == "CANCELLED" or $s == "TIMED_OUT" or $s == "ACTION_REQUIRED" or $s == "STARTUP_FAILURE")] | length' <<< "$relevant")
             echo "pending=$pending failed=$failed"
             if [[ $failed -gt 0 ]]; then
               echo "::error::Pull request #$PR has failing checks; leaving it open for review."
