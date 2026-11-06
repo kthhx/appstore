@@ -11,6 +11,7 @@ services:
       - ./data:/etc/mosdns
     environment:
       - TZ=${TIME_ZONE}
+      - crontabcnd="0 4 * * *"
     labels:
       createdBy: "Apps"
 networks:
