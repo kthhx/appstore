@@ -1,5 +1,13 @@
 additionalProperties:
   formFields:
+    - default: 2053
+      edit: true
+      envKey: PANEL_APP_PORT_UDP
+      labelEn: UDP service port
+      labelZh: UDP 服务端口
+      required: true
+      rule: paramPort
+      type: number
     - default: 20443
       edit: true
       envKey: PANEL_APP_PORT_HTTP
