@@ -4,7 +4,7 @@
 
 # Default image name without pre-install environment
 # renovate: datasource=docker depName=xream/sub-store
-IMAGE=xream/sub-store:2.44.7
+IMAGE=xream/sub-store:2.44.8
 
 {
   # Retain the original environment variables
