@@ -1,6 +1,6 @@
 services:
   adminer:
-    image: janiquiz/qdjob:v1.4.3
+    image: janiquiz/qdjob:v1.4.4
     container_name: ${CONTAINER_NAME}
     restart: always
     networks:
